@@ -1,11 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ScanFoodScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -14,8 +15,8 @@ export default function ScanFoodScreen({ navigation }) {
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.emoji}>📸</Text>
-        <Text style={styles.title}>Scan Food</Text>
+        <Ionicons name="camera-outline" size={64} color="#FF6B35" />
+        <Text style={styles.title}>Digitalizar Alimento</Text>
         <Text style={styles.subtitle}>Em desenvolvimento</Text>
       </View>
 
@@ -49,10 +50,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-  },
-  emoji: {
-    fontSize: 64,
-    marginBottom: 16,
+    gap: 16,
   },
   title: {
     fontSize: 28,

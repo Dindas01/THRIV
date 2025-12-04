@@ -1,11 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfessionalsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.emoji}>👥</Text>
+        <Ionicons name="people-outline" size={64} color="#FF6B35" />
         <Text style={styles.title}>Profissionais</Text>
         <Text style={styles.subtitle}>Em desenvolvimento</Text>
       </View>
@@ -25,10 +26,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-  },
-  emoji: {
-    fontSize: 64,
-    marginBottom: 16,
+    gap: 16,
   },
   title: {
     fontSize: 28,

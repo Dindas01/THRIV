@@ -191,13 +191,13 @@ export default function HomeScreen({ navigation }) {
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Ações Rápidas</Text>
         <View style={styles.actionsGrid}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionCard}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('ScanFood')}
           >
             <Ionicons name="camera-outline" size={32} color="#FF6B35" />
-            <Text style={styles.actionText}>Scan Food</Text>
+            <Text style={styles.actionText}>Digitalizar Alimento</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 

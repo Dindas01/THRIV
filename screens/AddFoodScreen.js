@@ -20,9 +20,17 @@ export default function AddFoodScreen({ navigation }) {
   const [results, setResults] = useState([]);
   const [selectedFood, setSelectedFood] = useState(null);
   const [portion, setPortion] = useState('100');
-  const [mealType, setMealType] = useState('Almoço');
+  const [mealType, setMealType] = useState('lunch');
 
-  const mealTypes = ['Pequeno-almoço', 'Almoço', 'Jantar', 'Snack'];
+  // Mapping: chave em inglês (guardada na BD) -> label em português (mostrado no UI)
+  const mealTypeLabels = {
+    'breakfast': 'Pequeno-almoço',
+    'lunch': 'Almoço',
+    'dinner': 'Jantar',
+    'snack': 'Snack',
+  };
+
+  const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
 
   const searchFood = async () => {
     if (!searchQuery.trim()) return;
@@ -103,6 +111,8 @@ export default function AddFoodScreen({ navigation }) {
       await setDoc(statsRef, {
         caloriesConsumed: increment(nutrients.calories),
         proteinConsumed: increment(nutrients.protein),
+        carbsConsumed: increment(nutrients.carbs),
+        fatConsumed: increment(nutrients.fat),
         date: today,
       }, { merge: true });
 
@@ -251,7 +261,7 @@ export default function AddFoodScreen({ navigation }) {
                       styles.mealTypeText,
                       mealType === type && styles.mealTypeTextActive
                     ]}>
-                      {type}
+                      {mealTypeLabels[type]}
                     </Text>
                   </TouchableOpacity>
                 ))}

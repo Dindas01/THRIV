@@ -35,7 +35,7 @@ function MainTabs() {
         tabBarActiveTintColor: '#FF6B35',
         tabBarInactiveTintColor: '#666666',
         tabBarStyle: {
-          backgroundColor: '#0D0D0D',
+          backgroundColor: '#000000',
           borderTopWidth: 1,
           borderTopColor: '#1A1A1A',
           height: 60,
@@ -136,7 +136,7 @@ export default function App() {
         initialRouteName={user ? "MainTabs" : "Onboarding"}
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#0D0D0D' },
+          contentStyle: { backgroundColor: '#000000' },
           animation: 'slide_from_right',
         }}
       >
@@ -199,7 +199,7 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
