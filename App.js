@@ -11,6 +11,7 @@ import { auth } from './firebase';
 import OnboardingScreen from './screens/OnboardingScreen';
 import SignupScreen from './screens/SignupScreen';
 import LoginScreen from './screens/LoginScreen';
+import SetupGoalsScreen from './screens/SetupGoalsScreen';
 import PaywallInitialScreen from './screens/PaywallInitialScreen';
 import HomeScreen from './screens/HomeScreen';
 import NutritionScreen from './screens/NutritionScreen';
@@ -139,6 +140,7 @@ export default function App() {
           animation: 'slide_from_right',
         }}
       >
+        {/* Auth Flow */}
         <Stack.Screen 
           name="Onboarding" 
           component={OnboardingScreen}
@@ -151,15 +153,24 @@ export default function App() {
           name="Login" 
           component={LoginScreen}
         />
+        
+        {/* Onboarding Flow */}
+        <Stack.Screen 
+          name="SetupGoals" 
+          component={SetupGoalsScreen}
+        />
         <Stack.Screen 
           name="PaywallInitial" 
           component={PaywallInitialScreen}
         />
+        
+        {/* Main App */}
         <Stack.Screen 
           name="MainTabs" 
           component={MainTabs}
         />
-        {/* Modal screens accessible from Home */}
+        
+        {/* Modal screens */}
         <Stack.Screen 
           name="ScanFood" 
           component={ScanFoodScreen}
