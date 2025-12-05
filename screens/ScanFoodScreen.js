@@ -15,7 +15,6 @@ import {
 import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import { Camera } from 'expo-camera';
 import { auth, db } from '../firebase';
 import { doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
@@ -76,12 +75,21 @@ export default function ScanFoodScreen({ navigation }) {
   // Convert image to base64
   const imageToBase64 = async (uri) => {
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+      // Usa ImagePicker base64 option em vez de FileSystem
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
       });
-      return base64;
     } catch (error) {
-      console.error('Error converting image to base64:', error);
+      console.error('Error converting to base64:', error);
       throw error;
     }
   };
