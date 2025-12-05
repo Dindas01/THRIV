@@ -26,19 +26,71 @@ export default function HomeScreen({ navigation }) {
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    // Reload data when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadDailyStats();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const loadUserData = async () => {
     try {
       const user = auth.currentUser;
       if (user) {
+        // Load user profile
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
-          setUserName(userDoc.data().name || 'Utilizador');
+          const userData = userDoc.data();
+          setUserName(userData.name || 'Utilizador');
+
+          // Set goals from user data
+          setDailyStats(prev => ({
+            ...prev,
+            caloriesGoal: userData.caloriesGoal || 2000,
+            proteinGoal: userData.proteinGoal || 150,
+          }));
         }
+
+        // Load today's stats
+        await loadDailyStats();
       }
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDailyStats = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const statsDoc = await getDoc(doc(db, 'users', user.uid, 'dailyStats', today));
+
+      if (statsDoc.exists()) {
+        const stats = statsDoc.data();
+        setDailyStats(prev => ({
+          ...prev,
+          caloriesConsumed: stats.caloriesConsumed || 0,
+          proteinConsumed: stats.proteinConsumed || 0,
+          waterGlasses: stats.waterGlasses || 0,
+          workoutMinutes: stats.workoutMinutes || 0,
+        }));
+      } else {
+        // Reset to 0 if no data for today
+        setDailyStats(prev => ({
+          ...prev,
+          caloriesConsumed: 0,
+          proteinConsumed: 0,
+          waterGlasses: 0,
+          workoutMinutes: 0,
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading daily stats:', error);
     }
   };
 
