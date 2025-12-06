@@ -1,15 +1,15 @@
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
-  Image
+  Image,
+  Animated
 } from 'react-native';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebase';
 import { doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
@@ -21,8 +21,41 @@ export default function AddFoodScreen({ navigation }) {
   const [selectedFood, setSelectedFood] = useState(null);
   const [portion, setPortion] = useState('100');
   const [mealType, setMealType] = useState('Almoço');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success'); // 'success', 'error', 'warning'
+
+  const toastAnim = useRef(new Animated.Value(-100)).current;
 
   const mealTypes = ['Pequeno-almoço', 'Almoço', 'Jantar', 'Snack'];
+
+  // Mapping Portuguese to English for database storage
+  const mealTypeToEnglish = {
+    'Pequeno-almoço': 'breakfast',
+    'Almoço': 'lunch',
+    'Jantar': 'dinner',
+    'Snack': 'snack',
+  };
+
+  const showToast = (message, type = 'success') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+
+    Animated.sequence([
+      Animated.timing(toastAnim, {
+        toValue: 60,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.delay(type === 'success' ? 2000 : 3000),
+      Animated.timing(toastAnim, {
+        toValue: -100,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setToastVisible(false));
+  };
 
   const searchFood = async () => {
     if (!searchQuery.trim()) return;
@@ -39,17 +72,20 @@ export default function AddFoodScreen({ navigation }) {
       
       if (data.products && data.products.length > 0) {
         // Filter products that have nutritional data
-        const validProducts = data.products.filter(p => 
-          p.nutriments && 
+        const validProducts = data.products.filter(p =>
+          p.nutriments &&
           (p.nutriments['energy-kcal_100g'] || p.nutriments['energy-kcal'])
         );
+        if (validProducts.length === 0) {
+          showToast('Não foram encontrados alimentos com dados nutricionais', 'warning');
+        }
         setResults(validProducts);
       } else {
-        Alert.alert('Sem resultados', 'Não foram encontrados alimentos. Tenta outra pesquisa.');
+        showToast('Não foram encontrados alimentos. Tenta outra pesquisa.', 'warning');
       }
     } catch (error) {
       console.error('Search error:', error);
-      Alert.alert('Erro', 'Erro ao pesquisar alimentos. Verifica a tua conexão.');
+      showToast('Erro ao pesquisar alimentos. Verifica a tua conexão.', 'error');
     } finally {
       setSearching(false);
     }
@@ -93,7 +129,7 @@ export default function AddFoodScreen({ navigation }) {
         carbs: nutrients.carbs,
         fat: nutrients.fat,
         portion: `${portion}g`,
-        mealType: mealType,
+        mealType: mealTypeToEnglish[mealType] || 'snack',
         timestamp: serverTimestamp(),
         date: today,
       });
@@ -103,17 +139,20 @@ export default function AddFoodScreen({ navigation }) {
       await setDoc(statsRef, {
         caloriesConsumed: increment(nutrients.calories),
         proteinConsumed: increment(nutrients.protein),
+        carbsConsumed: increment(nutrients.carbs),
+        fatConsumed: increment(nutrients.fat),
         date: today,
       }, { merge: true });
 
-      Alert.alert(
-        'Sucesso!', 
-        'Refeição adicionada com sucesso!',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      showToast('Refeição adicionada com sucesso!', 'success');
+
+      // Navigate back after delay
+      setTimeout(() => {
+        navigation.goBack();
+      }, 1500);
     } catch (error) {
       console.error('Save error:', error);
-      Alert.alert('Erro', 'Erro ao guardar refeição.');
+      showToast('Erro ao guardar refeição.', 'error');
     }
   };
 
@@ -121,6 +160,37 @@ export default function AddFoodScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* Toast Notification */}
+      {toastVisible && (
+        <Animated.View
+          style={[
+            styles.toast,
+            {
+              transform: [{ translateY: toastAnim }],
+              borderLeftColor:
+                toastType === 'success' ? '#4CAF50' :
+                toastType === 'error' ? '#F44336' :
+                '#FFC107',
+            },
+          ]}
+        >
+          <Ionicons
+            name={
+              toastType === 'success' ? 'checkmark-circle' :
+              toastType === 'error' ? 'close-circle' :
+              'warning'
+            }
+            size={20}
+            color={
+              toastType === 'success' ? '#4CAF50' :
+              toastType === 'error' ? '#F44336' :
+              '#FFC107'
+            }
+          />
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -224,14 +294,56 @@ export default function AddFoodScreen({ navigation }) {
             {/* Portion Input */}
             <View style={styles.portionSection}>
               <Text style={styles.label}>Porção (gramas)</Text>
-              <TextInput
-                style={styles.portionInput}
-                value={portion}
-                onChangeText={setPortion}
-                keyboardType="numeric"
-                placeholder="100"
-                placeholderTextColor="#666666"
-              />
+              <View style={styles.portionContainer}>
+                <TouchableOpacity
+                  style={styles.stepperButton}
+                  onPress={() => {
+                    const current = parseInt(portion) || 0;
+                    if (current > 10) setPortion(String(current - 10));
+                  }}
+                >
+                  <Ionicons name="remove" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.portionInput}
+                  value={portion}
+                  onChangeText={setPortion}
+                  keyboardType="numeric"
+                  placeholder="100"
+                  placeholderTextColor="#666666"
+                />
+                <TouchableOpacity
+                  style={styles.stepperButton}
+                  onPress={() => {
+                    const current = parseInt(portion) || 0;
+                    setPortion(String(current + 10));
+                  }}
+                >
+                  <Ionicons name="add" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+              {/* Quick Actions */}
+              <View style={styles.quickActionsRow}>
+                {[50, 100, 150, 200].map((amount) => (
+                  <TouchableOpacity
+                    key={amount}
+                    style={[
+                      styles.quickActionButton,
+                      portion === String(amount) && styles.quickActionButtonActive,
+                    ]}
+                    onPress={() => setPortion(String(amount))}
+                  >
+                    <Text
+                      style={[
+                        styles.quickActionText,
+                        portion === String(amount) && styles.quickActionTextActive,
+                      ]}
+                    >
+                      {amount}g
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
             {/* Meal Type Selector */}
@@ -263,20 +375,40 @@ export default function AddFoodScreen({ navigation }) {
               <View style={styles.nutrientsCard}>
                 <Text style={styles.nutrientsTitle}>Informação Nutricional ({portion}g)</Text>
                 <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Calorias</Text>
-                  <Text style={styles.nutrientValue}>{nutrients.calories} kcal</Text>
+                  <View style={styles.nutrientLabelContainer}>
+                    <View style={[styles.nutrientDot, { backgroundColor: '#FF6B35' }]} />
+                    <Text style={styles.nutrientLabel}>Calorias</Text>
+                  </View>
+                  <Text style={[styles.nutrientValue, { color: '#FF6B35' }]}>
+                    {nutrients.calories} kcal
+                  </Text>
                 </View>
                 <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Proteína</Text>
-                  <Text style={styles.nutrientValue}>{nutrients.protein}g</Text>
+                  <View style={styles.nutrientLabelContainer}>
+                    <View style={[styles.nutrientDot, { backgroundColor: '#4CAF50' }]} />
+                    <Text style={styles.nutrientLabel}>Proteína</Text>
+                  </View>
+                  <Text style={[styles.nutrientValue, { color: '#4CAF50' }]}>
+                    {nutrients.protein}g
+                  </Text>
                 </View>
                 <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Carboidratos</Text>
-                  <Text style={styles.nutrientValue}>{nutrients.carbs}g</Text>
+                  <View style={styles.nutrientLabelContainer}>
+                    <View style={[styles.nutrientDot, { backgroundColor: '#2196F3' }]} />
+                    <Text style={styles.nutrientLabel}>Carboidratos</Text>
+                  </View>
+                  <Text style={[styles.nutrientValue, { color: '#2196F3' }]}>
+                    {nutrients.carbs}g
+                  </Text>
                 </View>
                 <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Gordura</Text>
-                  <Text style={styles.nutrientValue}>{nutrients.fat}g</Text>
+                  <View style={styles.nutrientLabelContainer}>
+                    <View style={[styles.nutrientDot, { backgroundColor: '#FFC107' }]} />
+                    <Text style={styles.nutrientLabel}>Gordura</Text>
+                  </View>
+                  <Text style={[styles.nutrientValue, { color: '#FFC107' }]}>
+                    {nutrients.fat}g
+                  </Text>
                 </View>
               </View>
             )}
@@ -311,6 +443,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  toast: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(26, 26, 26, 0.95)',
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 12,
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -338,25 +495,34 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: 'rgba(26, 26, 26, 0.6)',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   searchInput: {
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
     color: '#FFFFFF',
+    fontWeight: '500',
   },
   searchButton: {
     backgroundColor: '#FF6B35',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   searchButtonText: {
     color: '#FFFFFF',
@@ -384,18 +550,23 @@ const styles = StyleSheet.create({
   foodCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: 'rgba(26, 26, 26, 0.6)',
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   foodImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   foodInfo: {
     flex: 1,
@@ -412,9 +583,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   foodCalories: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#FF6B35',
-    fontWeight: '600',
+    fontWeight: '700',
+    marginTop: 4,
   },
   detailsSection: {
     marginBottom: 24,
@@ -456,15 +628,59 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 12,
   },
+  portionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  stepperButton: {
+    backgroundColor: 'rgba(26, 26, 26, 0.6)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
   portionInput: {
-    backgroundColor: '#1A1A1A',
+    flex: 1,
+    backgroundColor: 'rgba(26, 26, 26, 0.6)',
     borderRadius: 12,
     padding: 16,
-    fontSize: 18,
+    fontSize: 22,
     color: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickActionButton: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 107, 53, 0.2)',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    alignItems: 'center',
+  },
+  quickActionButtonActive: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  quickActionText: {
+    color: '#FF6B35',
+    fontSize: 14,
     fontWeight: '600',
+  },
+  quickActionTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   mealTypeSection: {
     marginBottom: 24,
@@ -475,63 +691,101 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   mealTypeButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 20,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: 'rgba(26, 26, 26, 0.6)',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginRight: 8,
+    marginBottom: 8,
   },
   mealTypeButtonActive: {
     backgroundColor: '#FF6B35',
     borderColor: '#FF6B35',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   mealTypeText: {
     color: '#AAAAAA',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   mealTypeTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
   nutrientsCard: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: 'rgba(26, 26, 26, 0.6)',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 24,
+    marginBottom: 100,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   nutrientsTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 16,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   nutrientRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 12,
+  },
+  nutrientLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  nutrientDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
   },
   nutrientLabel: {
     fontSize: 16,
     color: '#AAAAAA',
+    fontWeight: '500',
   },
   nutrientValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   saveButton: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#FF6B35',
-    borderRadius: 16,
-    paddingVertical: 18,
+    paddingVertical: 20,
     alignItems: 'center',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   emptyState: {
     alignItems: 'center',
